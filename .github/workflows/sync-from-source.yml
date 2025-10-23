@@ -35,7 +35,7 @@ jobs:
           git clone https://github.com/krwenholz/krwenholz.github.io.git source-repo
           
           # Copy files from source (excluding .git directory and config.toml)
-          rsync --no-detach -av --delete --exclude='.git' --exclude='.github' --exclude='config.toml' source-repo/ ./
+          rsync -av --delete --exclude='.git' --exclude='.github' --exclude='config.toml' source-repo/ ./
           
           # Restore config.toml file if it existed
           if [ -f /tmp/config.toml.backup ]; then
