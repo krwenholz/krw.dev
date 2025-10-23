@@ -1,0 +1,57 @@
+name: Sync from Source Repository
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout target repository (this repo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Backup config
+        run: |
+          if [ -f config.toml ]; then
+            cp config.toml /tmp/config.toml.backup
+            echo "config.toml file backed up"
+          fi
+      
+      - name: Clone source repository and sync
+        run: |
+          # Configure git
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+          # Clone the source repository
+          git clone https://github.com/krwenholz/krwenholz.github.io.git source-repo
+          
+          # Copy files from source (excluding .git directory and config.toml)
+          rsync -av --delete --exclude='.git' --exclude='.github' --exclude='config.toml' source-repo/ ./
+          
+          # Restore config.toml file if it existed
+          if [ -f /tmp/config.toml.backup ]; then
+            cp /tmp/config.toml.backup config.toml
+            echo "config.toml file restored"
+          fi
+
+          rm -rf source-repo
+      
+      - name: Commit and push changes
+        run: |
+          git add .
+          
+          if git diff --staged --quiet; then
+            echo "No changes to sync"
+          else
+            git commit -m "Sync from krwenholz.github.io - $(date +'%Y-%m-%d %H:%M:%S')"
+            git push origin main  # Change to 'gh-pages' if needed
+          fi
