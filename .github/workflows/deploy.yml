@@ -4,6 +4,10 @@ on:
     - main
   workflow_dispatch:  # Allow manual triggering
 name: Publish
+
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Do it!
