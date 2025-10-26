@@ -20,9 +20,9 @@ jobs:
       
       - name: Backup config
         run: |
-          if [ -f config.toml ]; then
-            cp config.toml /tmp/config.toml.backup
-            echo "config.toml file backed up"
+          if [ -f hugo.toml ]; then
+            cp hugo.toml /tmp/hugo.toml.backup
+            echo "hugo.toml file backed up"
           fi
       
       - name: Clone source repository and sync
@@ -34,13 +34,13 @@ jobs:
           # Clone the source repository
           git clone https://github.com/krwenholz/krwenholz.github.io.git /tmp/source-repo
           
-          # Copy files from source (excluding .git directory and config.toml)
-          rsync -av --delete --exclude='.git' --exclude='.github' --exclude='config.toml' /tmp/source-repo/ ./
+          # Copy files from source (excluding .git directory and hugo.toml)
+          rsync -av --delete --exclude='.git' --exclude='.github' --exclude='hugo.toml' /tmp/source-repo/ ./
           
-          # Restore config.toml file if it existed
-          if [ -f /tmp/config.toml.backup ]; then
-            cp /tmp/config.toml.backup config.toml
-            echo "config.toml file restored"
+          # Restore hugo.toml file if it existed
+          if [ -f /tmp/hugo.toml.backup ]; then
+            cp /tmp/hugo.toml.backup hugo.toml
+            echo "hugo.toml file restored"
           fi
       
       - name: Commit and push changes
