@@ -6,50 +6,62 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:  # Allow manual triggering
 
+permissions:
+  contents: write
+  actions: write  # Needed to start the Publish workflow and keep this one enabled
+
 jobs:
   sync:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BASE_URL: https://www.krw.dev/
+
     steps:
       - name: Checkout target repository (this repo)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Backup config
-        run: |
-          if [ -f hugo.toml ]; then
-            cp hugo.toml /tmp/hugo.toml.backup
-            echo "hugo.toml file backed up"
-          fi
-      
+
       - name: Clone source repository and sync
         run: |
           # Configure git
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
-          
+
           # Clone the source repository
-          git clone https://github.com/krwenholz/krwenholz.github.io.git /tmp/source-repo
-          
-          # Copy files from source (excluding .git directory and hugo.toml)
-          rsync -av --delete --exclude='.git' --exclude='.github' --exclude='hugo.toml' /tmp/source-repo/ ./
-          
-          # Restore hugo.toml file if it existed
-          if [ -f /tmp/hugo.toml.backup ]; then
-            cp /tmp/hugo.toml.backup hugo.toml
-            echo "hugo.toml file restored"
-          fi
-      
+          git clone --depth 1 https://github.com/krwenholz/krwenholz.github.io.git /tmp/source-repo
+
+          # Copy everything from source except git metadata and workflows
+          rsync -av --delete --exclude='.git' --exclude='.github' /tmp/source-repo/ ./
+
+          # Use the source config as-is, pointed at this site's domain
+          sed -i "s|^baseURL *=.*|baseURL = \"${BASE_URL}\"|" hugo.toml
+          grep '^baseURL' hugo.toml
+
       - name: Commit and push changes
+        id: commit
         run: |
           git add .
-          
+
           if git diff --staged --quiet; then
             echo "No changes to sync"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "Sync from krwenholz.github.io - $(date +'%Y-%m-%d %H:%M:%S')"
-            git push origin main  # Change to 'gh-pages' if needed
+            git push origin main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Pushes made with GITHUB_TOKEN don't trigger other workflows' `push`
+      # events, so the Publish workflow has to be started explicitly
+      # (workflow_dispatch is one of the few events GITHUB_TOKEN may trigger).
+      - name: Trigger Publish
+        if: steps.commit.outputs.changed == 'true'
+        run: gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+      # GitHub disables scheduled workflows after 60 days without repository
+      # activity. Re-enabling through the API on every run resets that clock.
+      - name: Keep schedule enabled
+        if: always()
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/sync-from-source.yml/enable"
